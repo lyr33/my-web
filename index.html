@@ -55,7 +55,7 @@ h1{margin-top:0;font-size:20px;text-align:center}
 <div class="grid">
 <div>
 <label>ticketNo筛选</label>
-<input id="ticket" value="T2935878970">
+<input id="ticket" placeholder="例如 T2935878970">
 </div>
 
 <div>
@@ -102,8 +102,8 @@ h1{margin-top:0;font-size:20px;text-align:center}
 </div>
 
 <div class="full">
-<button onclick="generate()">生成Proxypin JSON</button>
-<button onclick="downloadJSON()" style="background:#16a34a">下载 proxypin-scripts.json</button>
+<button onclick="generate()">预览</button>
+<button onclick="downloadJSON()" style="background:#16a34a">下载</button>
 </div>
 
 <div class="full">
@@ -118,6 +118,7 @@ function verifyPassword() {
     let pwd = document.getElementById("auth-pwd").value;
     if(pwd === "itp") {
         document.getElementById("auth-layer").style.display = "none";
+        syncFloor(); // 登录成功后初始化并自动生成首版预览
     } else {
         alert("密码错误，请重新输入！");
     }
@@ -180,6 +181,7 @@ if(g === "SOUND CHECK(STANDING)"){
 
     $("seatInfo").value=[g,floor,side,row,seat].filter(Boolean).join(" ");
 }
+generate(); // 每次座位变动实时刷新预览
 }
 
 // 完美兼容特殊符号、中文及韩文的 UTF-8 Hex 转换
@@ -449,8 +451,11 @@ async function onResponse(context, request, response) {
 }
 
 function generate(){
+let ticketInput = $("ticket").value.trim();
+if(!ticketInput) {
+    ticketInput = $("ticket").placeholder.replace("例如 ", "");
+}
 
-let ticket=$("ticket").value;
 let d=dateMap[$("date").value];
 let bdate=$("bdate").value;
 let g=$("grade").value;
@@ -468,7 +473,7 @@ if(g === "SOUND CHECK(STANDING)"){
 let info=$("seatInfo").value;
 
 // 敏感字符串及票号 Hex 混淆处理
-let hTicket = toHex(ticket);
+let hTicket = toHex(ticketInput);
 let hGoodsCode = toHex("26013161");
 let hGoodsName = toHex("TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL");
 let hPlaceCode = toHex("26001143");
@@ -524,17 +529,21 @@ change4Script
 $("output").value=JSON.stringify(arr,null,2);
 }
 
-$("grade").onchange=syncFloor;
-$("floor").onchange=makeSeatInfo;
-$("row").oninput=makeSeatInfo;
-$("seat").oninput=makeSeatInfo;
-
-syncFloor();
+// 绑定所有输入项的实时变动监听，实现预览框自动跟随更新
+$("ticket").oninput = generate;
+$("date").onchange = function() { generate(); };
+$("bdate").oninput = generate;
+$("grade").onchange = function() { syncFloor(); };
+$("floor").onchange = makeSeatInfo;
+$("row").oninput = makeSeatInfo;
+$("seat").oninput = makeSeatInfo;
+$("seatInfo").oninput = generate;
 
 function downloadJSON(){
+    generate(); // 确保生成最新内容
     let content = $("output").value;
     if(!content){
-        alert("请先生成JSON");
+        alert("生成失败，请检查输入内容");
         return;
     }
 
