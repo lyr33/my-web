@@ -113,7 +113,7 @@ h1{margin-top:0;font-size:20px;text-align:center}
 </div>
 
 <script>
-// 密码验证逻辑（密码已改为 itp）
+// 密码验证逻辑
 function verifyPassword() {
     let pwd = document.getElementById("auth-pwd").value;
     if(pwd === "itp") {
@@ -182,6 +182,22 @@ if(g === "SOUND CHECK(STANDING)"){
 }
 }
 
+// 完美兼容特殊符号、中文及韩文的 UTF-8 Hex 转换
+function toHex(str) {
+    let encoded = encodeURIComponent(str);
+    let hex = '';
+    for (let i = 0; i < encoded.length; i++) {
+        let c = encoded[i];
+        if (c === '%') {
+            hex += encoded.substr(i + 1, 2);
+            i += 2;
+        } else {
+            hex += ('0' + c.charCodeAt(0).toString(16)).slice(-2);
+        }
+    }
+    return hex;
+}
+
 function makeScript(name,url,body){
 return {
 enabled:true,
@@ -191,8 +207,16 @@ script:body
 };
 }
 
-function getReservationTpl(ticket, d) {
-    return `function onRequest(context, request) {
+function getReservationTpl(hTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+    return `function _h(hex) {
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2) {
+        str += '%' + hex.substr(i, 2);
+    }
+    return decodeURIComponent(str);
+}
+
+function onRequest(context, request) {
     return request;
 }
 
@@ -207,7 +231,7 @@ function onResponse(context, request, response) {
         json.data.forEach(item => {
             if (
                 item &&
-                item.repTicketNo === "${ticket}"
+                item.repTicketNo === _h("${hTicket}")
             ) {
                 // 场次时间
                 item.playDateTime =
@@ -220,11 +244,11 @@ function onResponse(context, request, response) {
                 item.playEndDateTime =
                     "${d.end}";
                     
-                item.goodsCode = "26013161";
-                item.goodsName = "TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL";
-                item.placeCode = "26001143";
-                item.placeName = "KSPO DOME";
-                item.posterImgUrl = "https://ticketimage.interpark.com/Play/image/large/26/26013161_p.gif";
+                item.goodsCode = _h("${hGoodsCode}");
+                item.goodsName = _h("${hGoodsName}");
+                item.placeCode = _h("${hPlaceCode}");
+                item.placeName = _h("${hPlaceName}");
+                item.posterImgUrl = _h("${hImgUrl}");
             }
         });
 
@@ -242,8 +266,16 @@ function onResponse(context, request, response) {
 }`;
 }
 
-function getDetailsTpl(ticket, d, bdate, g, f, r, s, p) {
-    return `async function onRequest(context, request) {
+function getDetailsTpl(hTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+    return `function _h(hex) {
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2) {
+        str += '%' + hex.substr(i, 2);
+    }
+    return decodeURIComponent(str);
+}
+
+async function onRequest(context, request) {
     return request;
 }
 
@@ -262,7 +294,7 @@ async function onResponse(context, request, response) {
 
         var data = JSON.parse(response.body);
 
-        var TARGET_TICKET_NO = "${ticket}";
+        var TARGET_TICKET_NO = _h("${hTicket}");
 
         if (!data || !Array.isArray(data.data)) {
             return response;
@@ -274,15 +306,13 @@ async function onResponse(context, request, response) {
             }
 
             // 演出信息
-            ticket.goodsName = "TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL";
+            ticket.goodsName = _h("${hGoodsName}");
 
-            ticket.placeCode = "26001143";
-            ticket.placeName = "KSPO DOME";
-            ticket.postImageUrl =
-                "https://ticketimage.interpark.com/Play/image/large/26/26013161_p.gif";
+            ticket.placeCode = _h("${hPlaceCode}");
+            ticket.placeName = _h("${hPlaceName}");
+            ticket.postImageUrl = _h("${hImgUrl}");
 
-            //ticket.delyMethod = "";
-            ticket.goodsCode = "26013161";
+            ticket.goodsCode = _h("${hGoodsCode}");
 
             ticket.startDate = "20261113";
             ticket.endDate = "20261115";
@@ -322,8 +352,16 @@ async function onResponse(context, request, response) {
 }`;
 }
 
-function getQrTpl(ticket, d, g, info, p) {
-    return `async function onRequest(context, request) {
+function getQrTpl(hTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+    return `function _h(hex) {
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2) {
+        str += '%' + hex.substr(i, 2);
+    }
+    return decodeURIComponent(str);
+}
+
+async function onRequest(context, request) {
     return request;
 }
 
@@ -338,7 +376,7 @@ async function onResponse(context, request, response) {
 
         var data = JSON.parse(response.body);
 
-        var TARGET_TICKET_NO = "${ticket}";
+        var TARGET_TICKET_NO = _h("${hTicket}");
 
         // 你的数据结构是 result
         if (!data || !Array.isArray(data.result)) {
@@ -358,13 +396,12 @@ async function onResponse(context, request, response) {
             // 修改演出信息
             // ======================
 
-            ticket.goodsName =
-                "TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL";
+            ticket.goodsName = _h("${hGoodsName}");
 
-            ticket.placeCode = "26001143";
-            ticket.placeName = "KSPO DOME";
+            ticket.placeCode = _h("${hPlaceCode}");
+            ticket.placeName = _h("${hPlaceName}");
 
-            ticket.goodsCode = "26013161";
+            ticket.goodsCode = _h("${hGoodsCode}");
             ticket.qrStatus = "USED_ACTIVE";
 
 
@@ -372,7 +409,7 @@ async function onResponse(context, request, response) {
             ticket.images = [
                 {
                     id: 6000014,
-                    url: "https://ticketimage.interpark.com/Play/image/large/26/26013161_p.gif",
+                    url: _h("${hImgUrl}"),
                     order: 1
                 }
             ];
@@ -430,14 +467,58 @@ if(g === "SOUND CHECK(STANDING)"){
 
 let info=$("seatInfo").value;
 
-let reservation = getReservationTpl(ticket, d);
-let details = getDetailsTpl(ticket, d, bdate, g, f, r, s, p);
-let qr = getQrTpl(ticket, d, g, info, p);
+// 敏感字符串及票号 Hex 混淆处理
+let hTicket = toHex(ticket);
+let hGoodsCode = toHex("26013161");
+let hGoodsName = toHex("TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL");
+let hPlaceCode = toHex("26001143");
+let hPlaceName = toHex("KSPO DOME");
+let hImgUrl = toHex("https://ticketimage.interpark.com/Play/image/large/26/26013161_p.gif");
+
+let reservation = getReservationTpl(hTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+let details = getDetailsTpl(hTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+let qr = getQrTpl(hTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+
+let change4Script = {
+    enabled: true,
+    name: "change-4",
+    url: [
+        "https://tickets.interpark.com/mt/detail",
+        "https://tickets.interpark.com/mt/api/mobile-tickets/detail"
+    ],
+    script: `function onRequest(context, request) {
+    return request;
+}
+
+function onResponse(context, request, response) {
+    var body = response.body;
+
+    if (typeof body !== "string") return response;
+
+    body = body
+        .replaceAll('"locale":"ko"', '"locale":"en"')
+        .replaceAll('\\\\\"locale\\\\\":\\\\\"ko\\\\\"', '\\\\\"locale\\\\\":\\\\\"en\\\\\"')
+        .replaceAll('"lang":"KO"', '"lang":"EN"')
+        .replaceAll('\\\\\"lang\\\\\":\\\\\"KO\\\\\"', '\\\\\"lang\\\\\":\\\\\"EN\\\\\"')
+        .replaceAll("lang=ko", "lang=en")
+        .replaceAll('<html lang="ko">', '<html lang="en">');
+
+    response.body = body;
+
+    if (response.headers) {
+        delete response.headers["Content-Length"];
+        delete response.headers["content-length"];
+    }
+
+    return response;
+}`
+};
 
 let arr=[
 makeScript("change-1","https://world.nol.com/api/biz/enter/reservations",reservation),
 makeScript("change-2","https://world.nol.com/api/biz/enter/reservations/details",details),
-makeScript("change-3","https://tickets.interpark.com/mt/api/mobile-tickets/detail",qr)
+makeScript("change-3","https://tickets.interpark.com/mt/api/mobile-tickets/detail",qr),
+change4Script
 ];
 
 $("output").value=JSON.stringify(arr,null,2);
