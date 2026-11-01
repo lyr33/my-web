@@ -251,6 +251,12 @@ function onResponse(context, request, response) {
                 item.placeCode = _h("${hPlaceCode}");
                 item.placeName = _h("${hPlaceName}");
                 item.posterImgUrl = _h("${hImgUrl}");
+                item.facePassGoods= true;
+                item.alwaysGoods = false;
+                item.deliveryStatus = "36032";
+                item.genreName = "Concert";
+                item.genreCode = "01003";
+                item.salesType = "21001";
             }
         });
 
@@ -318,6 +324,7 @@ async function onResponse(context, request, response) {
 
             ticket.startDate = "20261113";
             ticket.endDate = "20261115";
+            ticket.salesType = "21001";
 
             ticket.playDate = "${d.playDate}";
             ticket.playTime = "${d.time}";
@@ -336,6 +343,7 @@ async function onResponse(context, request, response) {
 
             // 金额
             ticket.salesPrice = "${p}.0";
+            ticket.reservationFee = "8000.0";
             ticket.sttlAmount = ${p+8000}.0;
         });
 
@@ -362,6 +370,41 @@ function getQrTpl(hTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hP
     }
     return decodeURIComponent(str);
 }
+function findTickets(obj) {
+    var tickets = [];
+    var visited = new WeakSet();
+
+    function walk(value) {
+        if (!value || typeof value !== "object") {
+            return;
+        }
+
+        if (visited.has(value)) {
+            return;
+        }
+        visited.add(value);
+
+        if (Array.isArray(value)) {
+            value.forEach(walk);
+            return;
+        }
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                value, "ticketNo"
+            )
+        ) {
+            tickets.push(value);
+        }
+
+        Object.keys(value).forEach(function(key) {
+            walk(value[key]);
+        });
+    }
+
+    walk(obj);
+    return tickets;
+}
 
 async function onRequest(context, request) {
     return request;
@@ -369,9 +412,6 @@ async function onRequest(context, request) {
 
 async function onResponse(context, request, response) {
     try {
-        var url = request.url || "";
-
-     
         if (typeof response.body !== "string") {
             return response;
         }
@@ -380,16 +420,13 @@ async function onResponse(context, request, response) {
 
         var TARGET_TICKET_NO = _h("${hTicket}");
 
-        // 你的数据结构是 result
-        if (!data || !Array.isArray(data.result)) {
-            return response;
-        }
+        var tickets = findTickets(data);
+        var modifiedCount = 0;
 
-
-        data.result.forEach(function(ticket) {
-
-            // ticketNo匹配
-            if (!ticket || ticket.ticketNo !== TARGET_TICKET_NO) {
+        tickets.forEach(function(ticket) {
+            if (
+                String(ticket.ticketNo) !== TARGET_TICKET_NO
+            ) {
                 return;
             }
 
@@ -422,6 +459,12 @@ async function onResponse(context, request, response) {
             ticket.playDate = "${d.playDate}";
             ticket.playWeekDay = "${d.week}";
             ticket.playStartTime = "${d.time}";
+
+            ticket.qrAutoEnlarge = true;
+            ticket.manualEntry = true;
+            ticket.facePass = true;
+            ticket.selfViewRequired = true;
+            ticket.notice = "- Admission is not permitted with a screenshot of the mobile ticket or a downloaded commemorative ticket.<br />- The QR code will become available 24 hours before the performance.<br />- The “Send Mobile Ticket” function is not supported for this performance.<br />- This performance is accessible only via mobile ticket; no physical ticket will be issued.";
  
             // 座位
 
@@ -432,19 +475,27 @@ async function onResponse(context, request, response) {
 
             // 金额
             ticket.price = ${p};
+
+            modifiedCount++;
         });
 
 
-        response.body = JSON.stringify(data);
+        if (modifiedCount > 0) {
+            response.body = JSON.stringify(data);
 
-        // 删除长度避免缓存问题
-        if (response.headers) {
-            delete response.headers["Content-Length"];
-            delete response.headers["content-length"];
+            if (response.headers) {
+                delete response.headers["Content-Length"];
+                delete response.headers["content-length"];
+            }
         }
 
+        console.log(
+            "Found: " + tickets.length +
+            ", Modified: " + modifiedCount
+        );
+
     } catch (e) {
-        console.log(e);
+        console.log("Response processing error:", e);
     }
     return response;
 }`;
