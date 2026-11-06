@@ -54,8 +54,13 @@ h1{margin-top:0;font-size:20px;text-align:center}
 
 <div class="grid">
 <div>
-<label>ticketNo筛选</label>
+<label>ticketNo筛选 (原票号)</label>
 <input id="ticket" placeholder="例如 T2935878970">
+</div>
+
+<div>
+<label>新票号 (不填则不修改)</label>
+<input id="newTicket" placeholder="例如 T2935878999">
 </div>
 
 <div>
@@ -209,7 +214,7 @@ script:body
 };
 }
 
-function getReservationTpl(hTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+function getReservationTpl(hTicket, hNewTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
     return `function _h(hex) {
     var str = '';
     for (var i = 0; i < hex.length; i += 2) {
@@ -235,6 +240,13 @@ function onResponse(context, request, response) {
                 item &&
                 item.repTicketNo === _h("${hTicket}")
             ) {
+                // 修改票号（若提供新票号）
+                var newT = _h("${hNewTicket}");
+                if (newT) {
+                    item.repTicketNo = newT;
+                    if (item.ticketNo) item.ticketNo = newT;
+                }
+
                 // 场次时间
                 item.playDateTime =
                     "${d.list}";
@@ -293,7 +305,7 @@ function onResponse(context, request, response) {
 }`;
 }
 
-function getDetailsTpl(hTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+function getDetailsTpl(hTicket, hNewTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
     return `function _h(hex) {
     var str = '';
     for (var i = 0; i < hex.length; i += 2) {
@@ -330,6 +342,13 @@ async function onResponse(context, request, response) {
         data.data.forEach(function(ticket) {
             if (!ticket || ticket.ticketNo !== TARGET_TICKET_NO) {
                 return;
+            }
+
+            // 修改票号（若提供新票号）
+            var newT = _h("${hNewTicket}");
+            if (newT) {
+                ticket.ticketNo = newT;
+                if (ticket.repTicketNo) ticket.repTicketNo = newT;
             }
 
             // 演出信息
@@ -381,7 +400,7 @@ async function onResponse(context, request, response) {
 }`;
 }
 
-function getQrTpl(hTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
+function getQrTpl(hTicket, hNewTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl) {
     return `function _h(hex) {
     var str = '';
     for (var i = 0; i < hex.length; i += 2) {
@@ -449,6 +468,14 @@ async function onResponse(context, request, response) {
                 return;
             }
 
+            // 修改票号及相关条形码字段（若提供新票号）
+            var newT = _h("${hNewTicket}");
+            if (newT) {
+                ticket.ticketNo = newT;
+                if (ticket.barcodeTicketNo) ticket.barcodeTicketNo = newT;
+                if (ticket.displayTicketNo) ticket.displayTicketNo = newT;
+                if (ticket.qrValue) ticket.qrValue = ticket.qrValue.replace(TARGET_TICKET_NO, newT)
+            }
 
             // ======================
             // 修改演出信息
@@ -526,6 +553,8 @@ if(!ticketInput) {
     ticketInput = $("ticket").placeholder.replace("例如 ", "");
 }
 
+let newTicketInput = $("newTicket").value.trim();
+
 let d=dateMap[$("date").value];
 let bdate=$("bdate").value;
 let g=$("grade").value;
@@ -544,15 +573,16 @@ let info=$("seatInfo").value;
 
 // 敏感字符串及票号 Hex 混淆处理
 let hTicket = toHex(ticketInput);
+let hNewTicket = toHex(newTicketInput);
 let hGoodsCode = toHex("26013161");
 let hGoodsName = toHex("TOMORROW X TOGETHER WORLD TOUR 〈STEAL THE WIND〉 IN SEOUL");
 let hPlaceCode = toHex("26001143");
 let hPlaceName = toHex("KSPO DOME");
 let hImgUrl = toHex("https://ticketimage.interpark.com/Play/image/large/26/26013161_p.gif");
 
-let reservation = getReservationTpl(hTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
-let details = getDetailsTpl(hTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
-let qr = getQrTpl(hTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+let reservation = getReservationTpl(hTicket, hNewTicket, d, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+let details = getDetailsTpl(hTicket, hNewTicket, d, bdate, g, f, r, s, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
+let qr = getQrTpl(hTicket, hNewTicket, d, g, info, p, hGoodsCode, hGoodsName, hPlaceCode, hPlaceName, hImgUrl);
 
 let change4Script = {
     enabled: true,
@@ -601,6 +631,7 @@ $("output").value=JSON.stringify(arr,null,2);
 
 // 绑定所有输入项的实时变动监听，实现预览框自动跟随更新
 $("ticket").oninput = generate;
+$("newTicket").oninput = generate;
 $("date").onchange = function() { generate(); };
 $("bdate").oninput = generate;
 $("grade").onchange = function() { syncFloor(); };
